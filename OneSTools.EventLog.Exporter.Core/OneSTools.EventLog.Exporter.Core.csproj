@@ -8,6 +8,7 @@
     <Description>Базовый пакет экспортеров ЖР</Description>
     <Copyright>Akpaev Evgeny</Copyright>
     <Version>1.1.1</Version>
+	<LangVersion>9.0</LangVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
