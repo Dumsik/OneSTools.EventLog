@@ -103,9 +103,17 @@ namespace OneSTools.EventLog
                 }
                 else
                 {
-                    _settings.ItemId++;
-                    item.Id = _settings.ItemId;
-
+                    if (_settings.LiveMode)
+                    {
+                        _settings.ItemId++;
+                        item.Id = _settings.ItemId;
+                    }
+                    else
+                    {
+                        item.Id = 0;
+                        item.EndPosition = 0;
+                        item.LgfEndPosition = 0;
+                    }
                     break;
                 }
             }
@@ -115,7 +123,7 @@ namespace OneSTools.EventLog
 
         private bool SetNextLgpReader()
         {
-            string currentFileName = "19000101000000";
+            string currentFileName = "19000101000000.lgp";
 
             if (_lgpReader != null)
                 currentFileName = new FileInfo(_lgpReader.LgpPath).Name;
@@ -135,7 +143,8 @@ namespace OneSTools.EventLog
                     filesDateTime.Add((file, new FileInfo(file).Name));
                 }
             
-            filesDateTime.Sort((x, y) => string.Compare(y.Item2, x.Item2));
+            filesDateTime.Sort((x, y) => string.Compare(x.Item2, y.Item2));
+
             var (item1, _) = filesDateTime.FirstOrDefault(c => string.Compare(c.Item2, currentFileName) > 0);
 
             if (string.IsNullOrEmpty(item1))

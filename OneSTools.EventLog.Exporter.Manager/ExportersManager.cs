@@ -42,6 +42,7 @@ namespace OneSTools.EventLog.Exporter.Manager
         private readonly StorageType _storageType;
         private readonly DateTimeZone _timeZone = DateTimeZoneProviders.Tzdb.GetSystemDefault();
         private readonly int _writingMaxDop;
+        private readonly string _exporterName;
 
         public ExportersManager(ILogger<ExportersManager> logger, IServiceProvider serviceProvider,
             IConfiguration configuration)
@@ -56,6 +57,7 @@ namespace OneSTools.EventLog.Exporter.Manager
             _collectedFactor = configuration.GetValue("Exporter:CollectedFactor", 2);
             _loadArchive = configuration.GetValue("Exporter:LoadArchive", false);
             _readingTimeout = configuration.GetValue("Exporter:ReadingTimeout", 1);
+            _exporterName = configuration.GetValue<string>("Exporter:Name");
 
             var timeZone = configuration.GetValue("Exporter:TimeZone", "");
 
@@ -76,16 +78,7 @@ namespace OneSTools.EventLog.Exporter.Manager
                 }
                 case StorageType.ElasticSearch:
                 {
-                    _nodes = configuration.GetSection("ElasticSearch:Nodes").Get<List<ElasticSearchNode>>();
-                    if (_nodes == null)
-                        throw new Exception("ElasticSearch nodes are not specified");
-
-                    _separation = configuration.GetValue("ElasticSearch:Separation", "H");
-                    _maximumRetries = configuration.GetValue("ElasticSearch:MaximumRetries",
-                        ElasticSearchStorage.DefaultMaximumRetries);
-                    _maxRetryTimeout = TimeSpan.FromSeconds(configuration.GetValue("ElasticSearch:MaxRetryTimeout",
-                        ElasticSearchStorage.DefaultMaxRetryTimeoutSec));
-                    break;
+                    throw new Exception("ElasticSearch storage not supported");
                 }
             }
         }
@@ -103,6 +96,10 @@ namespace OneSTools.EventLog.Exporter.Manager
 
             if (_collectedFactor <= 0)
                 throw new Exception("CollectedFactor cannot be equal to or less than 0");
+
+            if (_exporterName == null)
+                throw new Exception("Manager name not defined");
+
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -134,12 +131,12 @@ namespace OneSTools.EventLog.Exporter.Manager
 
         private void ClstWatcher_InfoBasesDeleted(object sender, ClstEventArgs args)
         {
-            StartExporter(args.Path, args.Name, args.DataBaseName);
+            StopExporter(args.Path, args.Name);
         }
 
         private void ClstWatcher_InfoBasesAdded(object sender, ClstEventArgs args)
         {
-            StopExporter(args.Path, args.Name);
+            StartExporter(args.Path, args.Name, args.DataBaseName);
         }
 
         private void StartExporter(string path, string name, string dataBaseName)
@@ -170,7 +167,8 @@ namespace OneSTools.EventLog.Exporter.Manager
                             Portion = _portion,
                             ReadingTimeout = _readingTimeout,
                             TimeZone = _timeZone,
-                            WritingMaxDop = _writingMaxDop
+                            WritingMaxDop = _writingMaxDop,
+                            ExporterName = _exporterName
                         };
 
                         var exporter = new EventLogExporter(settings, storage, logger);
@@ -226,25 +224,10 @@ namespace OneSTools.EventLog.Exporter.Manager
                         (ILogger<ClickHouseStorage>) _serviceProvider.GetService(typeof(ILogger<ClickHouseStorage>));
                     var connectionString = $"{_connectionString}Database={dataBaseName};";
 
-                    return new ClickHouseStorage(connectionString, logger);
+                    return new ClickHouseStorage(connectionString, _exporterName, logger);
                 }
                 case StorageType.ElasticSearch:
-                {
-                    var logger =
-                        (ILogger<ElasticSearchStorage>) _serviceProvider.GetService(
-                            typeof(ILogger<ElasticSearchStorage>));
-
-                    var settings = new ElasticSearchStorageSettings
-                    {
-                        Index = dataBaseName,
-                        Separation = _separation,
-                        MaximumRetries = _maximumRetries,
-                        MaxRetryTimeout = _maxRetryTimeout
-                    };
-                    settings.Nodes.AddRange(_nodes);
-
-                    return new ElasticSearchStorage(settings, logger);
-                }
+                    throw new Exception("ElasticSearch storage type not supported");
                 case StorageType.None:
                     throw new Exception("StorageType parameter is not specified");
                 default:

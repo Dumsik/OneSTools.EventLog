@@ -13,5 +13,6 @@ namespace OneSTools.EventLog
         public long ItemId { get; set; } = 0;
         public int ReadingTimeout { get; set; } = Timeout.Infinite;
         public DateTimeZone TimeZone { get; set; } = DateTimeZoneProviders.Tzdb.GetSystemDefault();
+        public string ExporterName { get; set; } = "";
     }
 }

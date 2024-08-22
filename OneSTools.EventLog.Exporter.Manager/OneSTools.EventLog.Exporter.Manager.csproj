@@ -4,8 +4,8 @@
     <TargetFramework>net5.0</TargetFramework>
     <UserSecretsId>dotnet-OneSTools.EventLog.Exporter.Manager-436AD68C-DBEB-42E3-8010-E66614FE89B6</UserSecretsId>
     <AssemblyName>EventLogExportersManager</AssemblyName>
-    <Version>0.0.5</Version>
-    <Authors>Akpaev Evgeny</Authors>
+    <Version>2.0.0</Version>
+    <Authors>Kirilkin Dmitry Fork from Akpaev Evgeny</Authors>
     <Copyright>Akpaev Evgeny</Copyright>
     <Description>Менеджер служб экспорта журналов регистрации</Description>
   </PropertyGroup>

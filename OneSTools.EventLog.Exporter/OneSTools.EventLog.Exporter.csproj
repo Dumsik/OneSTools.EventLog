@@ -3,11 +3,11 @@
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
     <UserSecretsId>dotnet-EventLogExporterElasticSearch-E480DCDC-5542-443A-A879-763D915661EB</UserSecretsId>
-    <Authors>Akpaev Evgeny</Authors>
+    <Authors>Kirilkin Dmitry Fork from Akpaev Evgeny</Authors>
     <Copyright>Akpaev Evgeny</Copyright>
     <PackageProjectUrl></PackageProjectUrl>
     <Description>Служба для экспорта журнала регистрации 1С в ClickHouse и ElasticSearch</Description>
-    <Version>1.0.5</Version>
+    <Version>2.0.0</Version>
     <AssemblyName>EventLogExporter</AssemblyName>
     <RootNamespace>OneSTools.EventLog.Exporter</RootNamespace>
   </PropertyGroup>

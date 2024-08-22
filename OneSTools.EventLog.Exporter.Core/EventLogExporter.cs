@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Runtime;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
@@ -23,6 +24,7 @@ namespace OneSTools.EventLog.Exporter.Core
         private readonly IEventLogStorage _storage;
         private readonly DateTimeZone _timeZone = DateTimeZoneProviders.Tzdb.GetSystemDefault();
         private readonly int _writingMaxDop;
+        private readonly string _exporterName;
         private BatchBlock<EventLogItem> _batchBlock;
 
         private string _currentLgpFile;
@@ -46,7 +48,7 @@ namespace OneSTools.EventLog.Exporter.Core
             _loadArchive = settings.LoadArchive;
             _timeZone = settings.TimeZone;
             _readingTimeout = settings.ReadingTimeout;
-
+            _exporterName = settings.ExporterName;
             CheckSettings();
         }
 
@@ -62,7 +64,7 @@ namespace OneSTools.EventLog.Exporter.Core
             _collectedFactor = configuration.GetValue("Exporter:CollectedFactor", 2);
             _loadArchive = configuration.GetValue("Exporter:LoadArchive", false);
             _readingTimeout = configuration.GetValue("Exporter:ReadingTimeout", 1);
-
+            _exporterName = configuration.GetValue<string>("Exporter:Name");
             var timeZone = configuration.GetValue("Exporter:TimeZone", "");
 
             if (!string.IsNullOrWhiteSpace(timeZone))
@@ -88,6 +90,8 @@ namespace OneSTools.EventLog.Exporter.Core
 
             if (_collectedFactor <= 0)
                 throw new Exception("CollectedFactor cannot be equal to or less than 0");
+            if (_exporterName == null)
+                throw new Exception("Manager name not defined");
         }
 
         public async Task StartAsync(CancellationToken cancellationToken = default)
@@ -182,7 +186,8 @@ namespace OneSTools.EventLog.Exporter.Core
                 LogFolder = _logFolder,
                 LiveMode = true,
                 ReadingTimeout = _readingTimeout * 1000,
-                TimeZone = _timeZone
+                TimeZone = _timeZone,
+                ExporterName = _exporterName
             };
 
             if (!_loadArchive)

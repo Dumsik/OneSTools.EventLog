@@ -11,5 +11,6 @@ namespace OneSTools.EventLog.Exporter.Core
         public int CollectedFactor { get; set; } = 2;
         public int ReadingTimeout { get; set; } = 1;
         public bool LoadArchive { get; set; } = false;
+        public string ExporterName { get; set; } = "";
     }
 }

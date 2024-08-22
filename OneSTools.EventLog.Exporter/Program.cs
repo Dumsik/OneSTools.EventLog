@@ -20,10 +20,6 @@ namespace OneSTools.EventLog.Exporter
         public static IHostBuilder CreateHostBuilder(string[] args)
         {
             return Host.CreateDefaultBuilder(args)
-                //.ConfigureAppConfiguration(c => {
-                //    c.SetBasePath(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
-                //    c.AddJsonFile("appsettings.json");
-                //})
                 .UseWindowsService()
                 .UseSystemd()
                 .ConfigureLogging((hostingContext, logging) =>
@@ -42,8 +38,7 @@ namespace OneSTools.EventLog.Exporter
                             services.AddSingleton<IEventLogStorage, ClickHouseStorage>();
                             break;
                         case StorageType.ElasticSearch:
-                            services.AddSingleton<IEventLogStorage, ElasticSearchStorage>();
-                            break;
+                            throw new Exception($"{storageType} is not supported");
                         case StorageType.None:
                             throw new Exception("You must set StorageType parameter before starting the exporter");
                         default:

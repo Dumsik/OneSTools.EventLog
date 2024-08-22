@@ -18,12 +18,13 @@ namespace OneSTools.EventLog.Exporter.Core.ClickHouse
         private ClickHouseConnection _connection;
         private string _connectionString;
         private string _databaseName;
+        private readonly string _exporterName;
 
-        public ClickHouseStorage(string connectionsString, ILogger<ClickHouseStorage> logger = null)
+        public ClickHouseStorage(string connectionsString, string exporterName, ILogger<ClickHouseStorage> logger = null)
         {
             _logger = logger;
             _connectionString = connectionsString;
-
+            _exporterName = exporterName;
             Init();
         }
 
@@ -31,7 +32,7 @@ namespace OneSTools.EventLog.Exporter.Core.ClickHouse
         {
             _logger = logger;
             _connectionString = configuration.GetValue("ClickHouse:ConnectionString", "");
-
+            _exporterName = configuration.GetValue<string>("Exporter:Name");
             Init();
         }
 
@@ -40,7 +41,7 @@ namespace OneSTools.EventLog.Exporter.Core.ClickHouse
             await CreateConnectionAsync(cancellationToken);
 
             var commandText =
-                $"SELECT TOP 1 FileName, EndPosition, LgfEndPosition, Id FROM {TableName} ORDER BY DateTime DESC, EndPosition DESC";
+                 $"SELECT TOP 1 FileName, EndPosition, LgfEndPosition, Id FROM {TableName} WHERE ExporterName = '{_exporterName}' ORDER BY Id DESC";
 
             await using var cmd = _connection.CreateCommand();
             cmd.CommandText = commandText;
@@ -66,6 +67,7 @@ namespace OneSTools.EventLog.Exporter.Core.ClickHouse
 
             var data = entities.Select(item => new object[]
             {
+                _exporterName,
                 item.FileName ?? "",
                 item.EndPosition,
                 item.LgfEndPosition,
@@ -127,7 +129,7 @@ namespace OneSTools.EventLog.Exporter.Core.ClickHouse
         }
 
         private static string FixDatabaseName(string name)
-            => Regex.Replace(name, @"\W", "_", RegexOptions.Compiled);
+            => Regex.Replace(name, @"(?:\W|-)", "_", RegexOptions.Compiled);
 
         private async Task CreateConnectionAsync(CancellationToken cancellationToken = default)
         {
@@ -153,6 +155,7 @@ namespace OneSTools.EventLog.Exporter.Core.ClickHouse
             var commandText =
                 $@"CREATE TABLE IF NOT EXISTS {TableName}
                 (
+                    ExporterName LowCardinality(String),
                     FileName LowCardinality(String),
                     EndPosition Int64 Codec(DoubleDelta, LZ4),
                     LgfEndPosition Int64 Codec(DoubleDelta, LZ4),
