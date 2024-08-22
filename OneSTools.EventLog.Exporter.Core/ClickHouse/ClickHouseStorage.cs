@@ -182,8 +182,8 @@ namespace OneSTools.EventLog.Exporter.Core.ClickHouse
                     Session Int64 Codec(DoubleDelta, LZ4)
                 )
                 engine = MergeTree()
+                ORDER BY (DateTime)
                 PARTITION BY (toYYYYMM(DateTime))
-                ORDER BY (DateTime, EndPosition)
                 SETTINGS index_granularity = 8192;";
 
             await using var cmd = _connection.CreateCommand();
