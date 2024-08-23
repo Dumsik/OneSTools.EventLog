@@ -41,7 +41,20 @@ namespace OneSTools.EventLog.Exporter.Core.ClickHouse
             await CreateConnectionAsync(cancellationToken);
 
             var commandText =
-                 $"SELECT TOP 1 FileName, EndPosition, LgfEndPosition, Id FROM {TableName} WHERE ExporterName = '{_exporterName}' ORDER BY Id DESC";
+                $@"SELECT TOP 1 
+                    FileName, 
+                    max(EndPosition)  AS maxEndPosition, 
+                    max(LgfEndPosition) AS maxLgfEndPosition, 
+                    max(Id) AS maxId
+                FROM
+                    {TableName}
+                WHERE 
+                    ExporterName = '{_exporterName}'
+                GROUP BY 
+                    ExporterName, 
+                    FileName 
+                ORDER BY
+                    max(Id) desc;";
 
             await using var cmd = _connection.CreateCommand();
             cmd.CommandText = commandText;
@@ -179,7 +192,18 @@ namespace OneSTools.EventLog.Exporter.Core.ClickHouse
                     Server LowCardinality(String),
                     MainPort Int32 Codec(DoubleDelta, LZ4),
                     AddPort Int32 Codec(DoubleDelta, LZ4),
-                    Session Int64 Codec(DoubleDelta, LZ4)
+                    Session Int64 Codec(DoubleDelta, LZ4),
+                    PROJECTION projection_endPosition 
+                    (
+                       SELECT 
+                        FileName, 
+                        max(EndPosition), 
+                        max(LgfEndPosition), 
+                        max(Id) 
+                      GROUP BY 
+                        ExporterName, 
+                        FileName
+                    )
                 )
                 engine = MergeTree()
                 ORDER BY (DateTime)
@@ -189,6 +213,7 @@ namespace OneSTools.EventLog.Exporter.Core.ClickHouse
             await using var cmd = _connection.CreateCommand();
             cmd.CommandText = commandText;
             await cmd.ExecuteNonQueryAsync(cancellationToken);
+
         }
     }
 }
