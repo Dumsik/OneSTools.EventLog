@@ -182,6 +182,8 @@ namespace OneSTools.EventLog
                     return node[1];
                 case "B": // Boolean
                     return (string) node[1] == "0" ? "false" : "true";
+                case "N": // Numeric
+                    return node[1];
                 case "P": // Complex data
                     var str = new StringBuilder();
 
@@ -198,12 +200,19 @@ namespace OneSTools.EventLog
                     var subDataCount = subDataNode.Count - 1;
 
                     if (subDataCount > 0)
-                        for (var i = 1; i <= subDataCount; i++)
+                        for (var i = 0; i <= subDataCount; i++)
                         {
-                            var value = GetData(subDataNode[i]);
+                            if (subDataNode[i].Count > 0)
+                            {
+                                var value = GetData(subDataNode[i]);
 
-                            if (value != string.Empty)
-                                str.AppendLine($"Item {i}: {value}");
+                                if (value != string.Empty)
+                                    str.AppendLine($"Item {i}: {value}");
+                            }
+                            else
+                            {
+                                str.AppendLine($"frmt: {subDataNode[i]}");
+                            }
                         }
 
                     return str.ToString();
