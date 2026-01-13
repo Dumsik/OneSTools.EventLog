@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using NodaTime;
@@ -142,14 +144,19 @@ namespace OneSTools.EventLog
             var ev = _lgfReader.GetObjectValue(ObjectType.Events, parsedData[7], cancellationToken);
             eventLogItem.Event = GetEventPresentation(ev);
 
-            var severity = (string) parsedData[8];
+            var severity = (string)parsedData[8];
             eventLogItem.Severity = GetSeverityPresentation(severity);
 
             eventLogItem.Comment = parsedData[9];
 
             (value, uuid) = _lgfReader.GetReferencedObjectValue(ObjectType.Metadata, parsedData[10], cancellationToken);
-            eventLogItem.MetadataUuid = uuid;
-            eventLogItem.Metadata = value;
+            List<string> metadataNames = new List<string>();
+            List<string> metadataUuid = new List<string>();
+            if (value != string.Empty) 
+            { 
+                metadataNames.Add(value);
+                metadataUuid.Add(uuid);
+            }
 
             eventLogItem.Data = GetData(parsedData[11]).Trim();
             eventLogItem.DataPresentation = parsedData[12];
@@ -165,6 +172,18 @@ namespace OneSTools.EventLog
 
             eventLogItem.Session = parsedData[16];
 
+            var additionalMetadataCount = parsedData[17];
+            var strMetadataNames = new StringBuilder();
+            var strMetadataUuid = new StringBuilder();
+            if (additionalMetadataCount > 0)
+                for (var i = 0; i < additionalMetadataCount; i++)
+                {
+                    (value, uuid) = _lgfReader.GetReferencedObjectValue(ObjectType.Metadata, parsedData[18 + i], cancellationToken);
+                    metadataNames.Add(value);
+                    metadataUuid.Add(uuid);
+                }
+            eventLogItem.Metadata = strMetadataNames.AppendJoin(";", metadataNames.ToArray()).ToString();
+            eventLogItem.MetadataUuid = strMetadataUuid.AppendJoin(";", metadataUuid.ToArray()).ToString();
             return eventLogItem;
         }
 
