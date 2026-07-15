@@ -25,6 +25,14 @@ namespace OneSTools.EventLog.Exporter.Manager
                     var logPath = Path.Combine(hostingContext.HostingEnvironment.ContentRootPath, "log.txt");
                     logging.AddFile(logPath);
                     logging.AddConfiguration(hostingContext.Configuration.GetSection("Logging"));
+
+                    // IHttpClientFactory логирует каждый запрос к Zabbix на уровне Information —
+                    // при "Default": "Debug" в Logging это забивает лог, поэтому по умолчанию отключено
+                    if (!hostingContext.Configuration.GetValue("Zabbix:VerboseHttpLogging", false))
+                    {
+                        logging.AddFilter("System.Net.Http.HttpClient.IZabbixSender.LogicalHandler", LogLevel.Warning);
+                        logging.AddFilter("System.Net.Http.HttpClient.IZabbixSender.ClientHandler", LogLevel.Warning);
+                    }
                 })
                 .ConfigureServices((hostingContext, services) =>
                 {

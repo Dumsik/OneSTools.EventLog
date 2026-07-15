@@ -49,7 +49,8 @@
   "Enabled": false,
   "Server": "",
   "ItemsHost": "",
-  "StatusSendIntervalMinutes": 5
+  "StatusSendIntervalMinutes": 5,
+  "VerboseHttpLogging": false
 }
 ```
 
@@ -62,6 +63,11 @@
 - `StatusSendIntervalMinutes` — минимальный интервал между отправками статуса **одной и той
   же** базы, по умолчанию 5 минут (по указанию пользователя — для настройки триггеров на
   стороне Zabbix). На discovery не влияет (оно и так раз в сутки).
+- `VerboseHttpLogging` — по умолчанию `false`: подавляет диагностические логи уровня
+  Information от `IHttpClientFactory` для именованного клиента `IZabbixSender`
+  (`System.Net.Http.HttpClient.IZabbixSender.LogicalHandler`/`.ClientHandler`) — при
+  `"Logging:LogLevel:Default": "Debug"` эти логи по одной паре строк на каждый HTTP-запрос к
+  Zabbix иначе сильно забивают лог. Включается для отладки самих HTTP-запросов к Zabbix.
 
 ## Изменения в Core (`OneSTools.EventLog.Exporter.Core`)
 
@@ -134,7 +140,8 @@ Core не должен ничего знать про Zabbix — он тольк
      fire-and-forget (`_ = Task.Run(...)` с try/catch и логированием), просто пересылает
      каждое полученное от `EventLogExporter` событие в `_zabbixSender.SendStatusAsync` без
      какой-либо своей логики — троттлинг до раза в 5 минут целиком внутри `ZabbixSender`.
-   - в `ExecuteAsync` — фоновый цикл раз в 24 часа (`PeriodicTimer(TimeSpan.FromHours(24))`,
+   - в `ExecuteAsync` — фоновый цикл раз в 24 часа (`Task.Delay(TimeSpan.FromHours(24), ...)`
+     в цикле — `PeriodicTimer` недоступен, т.к. Manager собирается под `net5.0`, а не `net6.0+`;
      первая отправка сразу при старте), собирающий текущие `Name` из `_runExporters`
      и вызывающий `_zabbixSender.SendDiscoveryAsync(...)`. Discovery отражает **только базы,
      для которых сейчас реально запущен экспорт** (совпадает с трактовкой "базы, для которых
@@ -147,6 +154,11 @@ Core не должен ничего знать про Zabbix — он тольк
    **только для этого именованного/типизированного клиента**, никакой другой HTTP-трафик в
    решении это не затрагивает. Инлайн-колбэк вместо `HttpClientHandler.DangerousAcceptAny...`
    — этот статический хелпер не резолвился в окружении сборки пользователя.
+   В `ConfigureLogging` того же `Program.cs` — если `Zabbix:VerboseHttpLogging` не включён,
+   `logging.AddFilter(...)` глушит до уровня `Warning` категории
+   `System.Net.Http.HttpClient.IZabbixSender.LogicalHandler`/`.ClientHandler`, которые иначе
+   пишут по записи Information на каждый HTTP-запрос к Zabbix (заметно при
+   `"Logging:LogLevel:Default": "Debug"`).
 5. **`appsettings.json`** — добавить пример секции `Zabbix` (отключено по умолчанию).
 
 ## Допущения (проговорить на ревью)
