@@ -211,6 +211,7 @@ namespace OneSTools.EventLog.Exporter.Core.ClickHouse
                 engine = MergeTree()
                 ORDER BY (DateTime)
                 PARTITION BY (toYYYYMM(DateTime))
+                TTL DateTime + INTERVAL 3 YEAR DELETE WHERE NOT startsWith(Event, 'Данные.')
                 SETTINGS index_granularity = 8192;";
 
             await using var cmd = _connection.CreateCommand();
