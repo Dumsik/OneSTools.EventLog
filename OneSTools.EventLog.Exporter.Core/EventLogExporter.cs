@@ -28,12 +28,16 @@ namespace OneSTools.EventLog.Exporter.Core
         private BatchBlock<EventLogItem> _batchBlock;
 
         private string _currentLgpFile;
+        private int _pendingCount;
+        private CancellationToken _cancellationToken;
 
         private bool _disposedValue;
 
         // DataFlow blocks
         private EventLogReader _eventLogReader;
         private ActionBlock<EventLogItem[]> _writeBlock;
+
+        public event EventHandler<ExportPortionResult> ExportPortionCompleted;
 
         public EventLogExporter(EventLogExporterSettings settings, IEventLogStorage storage,
             ILogger<EventLogExporter> logger = null)
@@ -50,6 +54,8 @@ namespace OneSTools.EventLog.Exporter.Core
             _readingTimeout = settings.ReadingTimeout;
             _exporterName = settings.ExporterName;
             CheckSettings();
+
+            _storage.WriteAttemptFailed += Storage_WriteAttemptFailed;
         }
 
         public EventLogExporter(ILogger<EventLogExporter> logger, IConfiguration configuration,
@@ -75,6 +81,8 @@ namespace OneSTools.EventLog.Exporter.Core
             }
 
             CheckSettings();
+
+            _storage.WriteAttemptFailed += Storage_WriteAttemptFailed;
         }
 
         private void CheckSettings()
@@ -96,6 +104,8 @@ namespace OneSTools.EventLog.Exporter.Core
 
         public async Task StartAsync(CancellationToken cancellationToken = default)
         {
+            _cancellationToken = cancellationToken;
+
             _logger?.LogInformation($"Log folder: {_logFolder}");
 
             if (_loadArchive)
@@ -134,6 +144,12 @@ namespace OneSTools.EventLog.Exporter.Core
                     {
                         await SendAsync(_batchBlock, item, cancellationToken);
 
+                        // BatchBlock triggers a batch on its own once _portion items are buffered,
+                        // so the local counter must reset at the same boundary to stay in sync with it
+                        _pendingCount++;
+                        if (_pendingCount >= _portion)
+                            _pendingCount = 0;
+
                         if (!string.IsNullOrEmpty(_eventLogReader.LgpFileName) &&
                             _currentLgpFile != _eventLogReader.LgpFileName)
                         {
@@ -148,7 +164,18 @@ namespace OneSTools.EventLog.Exporter.Core
                     }
 
                     if (forceSending)
-                        _batchBlock.TriggerBatch();
+                    {
+                        if (_pendingCount == 0)
+                        {
+                            if (!cancellationToken.IsCancellationRequested)
+                                ExportPortionCompleted?.Invoke(this, new ExportPortionResult(true, 0));
+                        }
+                        else
+                        {
+                            _pendingCount = 0;
+                            _batchBlock.TriggerBatch();
+                        }
+                    }
                 }
             }
             catch (TaskCanceledException)
@@ -172,11 +199,24 @@ namespace OneSTools.EventLog.Exporter.Core
             };
 
             _writeBlock =
-                new ActionBlock<EventLogItem[]>(c => _storage.WriteEventLogDataAsync(c.ToList(), cancellationToken),
-                    writeBlockSettings);
+                new ActionBlock<EventLogItem[]>(async c =>
+                {
+                    await _storage.WriteEventLogDataAsync(c.ToList(), cancellationToken);
+
+                    if (!cancellationToken.IsCancellationRequested)
+                        ExportPortionCompleted?.Invoke(this, new ExportPortionResult(true, c.Length));
+                }, writeBlockSettings);
             _batchBlock = new BatchBlock<EventLogItem>(_portion, batchBlockSettings);
 
             _batchBlock.LinkTo(_writeBlock, new DataflowLinkOptions {PropagateCompletion = true});
+        }
+
+        private void Storage_WriteAttemptFailed(object sender, Exception ex)
+        {
+            if (_cancellationToken.IsCancellationRequested)
+                return;
+
+            ExportPortionCompleted?.Invoke(this, new ExportPortionResult(false, 0));
         }
 
         private async Task<EventLogReaderSettings> GetReaderSettingsAsync(CancellationToken cancellationToken = default)
@@ -249,7 +289,13 @@ namespace OneSTools.EventLog.Exporter.Core
             if (_disposedValue)
                 return;
 
-            if (disposing) _storage?.Dispose();
+            if (disposing)
+            {
+                if (_storage != null)
+                    _storage.WriteAttemptFailed -= Storage_WriteAttemptFailed;
+
+                _storage?.Dispose();
+            }
 
             _eventLogReader?.Dispose();
 

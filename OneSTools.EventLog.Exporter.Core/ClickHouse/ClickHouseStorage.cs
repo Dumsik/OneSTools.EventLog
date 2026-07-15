@@ -15,6 +15,8 @@ namespace OneSTools.EventLog.Exporter.Core.ClickHouse
     {
         private const string TableName = "EventLogItems";
         private readonly ILogger<ClickHouseStorage> _logger;
+
+        public event EventHandler<Exception> WriteAttemptFailed;
         private ClickHouseConnection _connection;
         private string _connectionString;
         private string _databaseName;
@@ -116,6 +118,7 @@ namespace OneSTools.EventLog.Exporter.Core.ClickHouse
                 catch (Exception ex)
                 {
                     _logger?.LogWarning(ex, $"Failed to write data to {_databaseName}." + System.Environment.NewLine + ex.Message);
+                    WriteAttemptFailed?.Invoke(this, ex);
                     await Task.Delay(1000);
                 }
             }

@@ -11,11 +11,26 @@ using NodaTime;
 using OneSTools.EventLog.Exporter.Core;
 using OneSTools.EventLog.Exporter.Core.ClickHouse;
 using OneSTools.EventLog.Exporter.Core.ElasticSearch;
+using OneSTools.EventLog.Exporter.Manager.Zabbix;
 
 namespace OneSTools.EventLog.Exporter.Manager
 {
     public class ExportersManager : BackgroundService
     {
+        private class RunningExporter
+        {
+            public CancellationTokenSource Cts { get; }
+            public string Name { get; }
+
+            public RunningExporter(CancellationTokenSource cts, string name)
+            {
+                Cts = cts;
+                Name = name;
+            }
+        }
+
+        private static readonly TimeSpan DiscoveryInterval = TimeSpan.FromHours(24);
+
         private readonly List<ClstFolder> _clstFolders;
         private readonly List<ClstWatcher> _clstWatchers = new();
 
@@ -33,10 +48,11 @@ namespace OneSTools.EventLog.Exporter.Manager
         private readonly List<ElasticSearchNode> _nodes;
         private readonly int _portion;
         private readonly int _readingTimeout;
-        private readonly Dictionary<string, CancellationTokenSource> _runExporters = new();
+        private readonly Dictionary<string, RunningExporter> _runExporters = new();
         private readonly string _separation;
 
         private readonly IServiceProvider _serviceProvider;
+        private readonly IZabbixSender _zabbixSender;
 
         // Common settings
         private readonly StorageType _storageType;
@@ -45,10 +61,11 @@ namespace OneSTools.EventLog.Exporter.Manager
         private readonly string _exporterName;
 
         public ExportersManager(ILogger<ExportersManager> logger, IServiceProvider serviceProvider,
-            IConfiguration configuration)
+            IConfiguration configuration, IZabbixSender zabbixSender)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
+            _zabbixSender = zabbixSender;
 
             _clstFolders = configuration.GetSection("Manager:ClstFolders").Get<List<ClstFolder>>();
             _storageType = configuration.GetValue("Exporter:StorageType", StorageType.None);
@@ -109,7 +126,7 @@ namespace OneSTools.EventLog.Exporter.Manager
                 lock (_runExporters)
                 {
                     foreach (var ib in _runExporters)
-                        ib.Value.Cancel();
+                        ib.Value.Cts.Cancel();
                 }
             });
 
@@ -126,7 +143,36 @@ namespace OneSTools.EventLog.Exporter.Manager
                 _clstWatchers.Add(clstWatcher);
             }
 
+            _ = RunDiscoveryLoopAsync(stoppingToken);
+
             await Task.Factory.StartNew(stoppingToken.WaitHandle.WaitOne, stoppingToken);
+        }
+
+        private async Task RunDiscoveryLoopAsync(CancellationToken stoppingToken)
+        {
+            try
+            {
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    List<string> dataBaseNames;
+                    lock (_runExporters)
+                        dataBaseNames = _runExporters.Values.Select(r => r.Name).ToList();
+
+                    try
+                    {
+                        await _zabbixSender.SendDiscoveryAsync(dataBaseNames, stoppingToken);
+                    }
+                    catch (Exception ex) when (!(ex is OperationCanceledException))
+                    {
+                        _logger?.LogWarning(ex, "Failed to send Zabbix LLD discovery");
+                    }
+
+                    await Task.Delay(DiscoveryInterval, stoppingToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
         }
 
         private void ClstWatcher_InfoBasesDeleted(object sender, ClstEventArgs args)
@@ -173,6 +219,8 @@ namespace OneSTools.EventLog.Exporter.Manager
 
                         var exporter = new EventLogExporter(settings, storage, logger);
 
+                        exporter.ExportPortionCompleted += (_, result) => ReportExportStatus(name, result.Success);
+
                         Task.Factory.StartNew(async () =>
                         {
                             try
@@ -188,7 +236,7 @@ namespace OneSTools.EventLog.Exporter.Manager
                             }
                         }, cts.Token);
 
-                        _runExporters.Add(path, cts);
+                        _runExporters.Add(path, new RunningExporter(cts, name));
 
                         _logger?.LogInformation(
                             $"Event log exporter for \"{name}\" information base to \"{dataBaseName}\" is started");
@@ -206,12 +254,27 @@ namespace OneSTools.EventLog.Exporter.Manager
         {
             lock (_runExporters)
             {
-                if (_runExporters.TryGetValue(id, out var cts))
+                if (_runExporters.TryGetValue(id, out var runningExporter))
                 {
-                    cts.Cancel();
+                    runningExporter.Cts.Cancel();
                     _logger?.LogInformation($"Event log exporter for \"{name}\" information base is stopped");
                 }
             }
+        }
+
+        private void ReportExportStatus(string name, bool success)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _zabbixSender.SendStatusAsync(name, success);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, $"Failed to report Zabbix export status for \"{name}\"");
+                }
+            });
         }
 
         private IEventLogStorage GetStorage(string dataBaseName)

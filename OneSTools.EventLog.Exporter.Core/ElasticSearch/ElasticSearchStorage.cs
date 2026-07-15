@@ -25,6 +25,8 @@ namespace OneSTools.EventLog.Exporter.Core.ElasticSearch
         private ElasticClient _client;
         private ElasticSearchNode _currentNode;
 
+        public event EventHandler<Exception> WriteAttemptFailed;
+
         public ElasticSearchStorage(ElasticSearchStorageSettings settings, ILogger<ElasticSearchStorage> logger = null)
         {
             _logger = logger;
