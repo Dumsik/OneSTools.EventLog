@@ -7,7 +7,7 @@
     <Authors>Kirilkin Dmitry Fork from Akpaev Evgeny</Authors>
     <Description>Базовый пакет экспортеров ЖР</Description>
     <Copyright>Akpaev Evgeny</Copyright>
-    <Version>2.0.0</Version>
+    <Version>2.0.1</Version>
 	<LangVersion>9.0</LangVersion>
   </PropertyGroup>
 

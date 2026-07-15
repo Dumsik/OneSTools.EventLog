@@ -201,7 +201,13 @@ namespace OneSTools.EventLog.Exporter.Core
                     if (!File.Exists(lgpFilePath))
                     {
                         _logger?.LogWarning(
-                            $"Lgp file ({lgpFilePath}) doesn't exist. The reading will be started from the first found file");
+                            $"Lgp file ({lgpFilePath}) doesn't exist. The reading will be started from the first found file, but the Id counter and the lgf position will be preserved");
+
+                        // Файл удалён (например, ротацией 1С), но lgf-файл общий для всех lgp-файлов
+                        // и счётчик Id должен оставаться монотонным, иначе запрос последней позиции
+                        // в хранилище снова и снова будет находить удалённый файл как "последний".
+                        eventLogReaderSettings.LgfStartPosition = position.LgfEndPosition;
+                        eventLogReaderSettings.ItemId = position.Id;
                     }
                     else
                     {
