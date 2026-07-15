@@ -34,8 +34,7 @@ namespace OneSTools.EventLog.Exporter.Manager
                     services.AddHttpClient<IZabbixSender, ZabbixSender>()
                         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
                         {
-                            ServerCertificateCustomValidationCallback =
-                                HttpClientHandler.DangerousAcceptAnyServerCertificateValidationCallback
+                            ServerCertificateCustomValidationCallback = (_, _, _, _) => true
                         });
 
                     services.AddHostedService<ExportersManager>();

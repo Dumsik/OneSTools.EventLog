@@ -142,11 +142,11 @@ Core не должен ничего знать про Zabbix — он тольк
      добавлении/удалении базы — строго раз в сутки, как написано в ТЗ.
 4. **`Program.cs`** — `services.Configure<ZabbixOptions>(configuration.GetSection("Zabbix"))`,
    `services.AddHttpClient<IZabbixSender, ZabbixSender>().ConfigurePrimaryHttpMessageHandler(() =>
-   new HttpClientHandler { ServerCertificateCustomValidationCallback =
-   HttpClientHandler.DangerousAcceptAnyServerCertificateValidationCallback })` — сервер Zabbix
-   отдаёт самоподписанный сертификат, поэтому валидация цепочки отключена **только для этого
-   именованного/типизированного клиента**, никакой другой HTTP-трафик в решении это не
-   затрагивает.
+   new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true })` —
+   сервер Zabbix отдаёт самоподписанный сертификат, поэтому валидация цепочки отключена
+   **только для этого именованного/типизированного клиента**, никакой другой HTTP-трафик в
+   решении это не затрагивает. Инлайн-колбэк вместо `HttpClientHandler.DangerousAcceptAny...`
+   — этот статический хелпер не резолвился в окружении сборки пользователя.
 5. **`appsettings.json`** — добавить пример секции `Zabbix` (отключено по умолчанию).
 
 ## Допущения (проговорить на ревью)
