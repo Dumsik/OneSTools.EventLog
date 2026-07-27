@@ -147,7 +147,7 @@ namespace OneSTools.EventLog
             var severity = (string)parsedData[8];
             eventLogItem.Severity = GetSeverityPresentation(severity);
 
-            eventLogItem.Comment = parsedData[9];
+            eventLogItem.Comment = TruncateLargeComment(parsedData[9]);
 
             (value, uuid) = _lgfReader.GetReferencedObjectValue(ObjectType.Metadata, parsedData[10], cancellationToken);
             List<string> metadataNames = new List<string>();
@@ -185,6 +185,28 @@ namespace OneSTools.EventLog
             eventLogItem.Metadata = strMetadataNames.AppendJoin(";", metadataNames.ToArray()).ToString();
             eventLogItem.MetadataUuid = strMetadataUuid.AppendJoin(";", metadataUuid.ToArray()).ToString();
             return eventLogItem;
+        }
+
+        private const int MaxCommentLengthMb = 10;
+
+        // Ограничение считается в символах (UTF-16): аномально большие Comment (десятки МБ) держатся
+        // в EventLogItem по всему батчу экспорта и уходят в хранилище, раздувая устойчивый пик памяти.
+        private const int MaxCommentLength = MaxCommentLengthMb * 1024 * 1024;
+
+        private static readonly string CommentTruncatedMarker =
+            $"\n\n[Комментарий обрезан из-за превышения размера в {MaxCommentLengthMb} мегабайт]";
+
+        private static string TruncateLargeComment(string comment)
+        {
+            if (comment is null || comment.Length <= MaxCommentLength)
+                return comment;
+
+            var cutLength = MaxCommentLength;
+            // не разрываем суррогатную пару на границе среза
+            if (char.IsHighSurrogate(comment[cutLength - 1]))
+                cutLength--;
+
+            return string.Concat(comment.AsSpan(0, cutLength), CommentTruncatedMarker);
         }
 
         private static string GetData(BracketsNode node)
