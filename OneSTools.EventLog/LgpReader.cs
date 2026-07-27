@@ -206,7 +206,7 @@ namespace OneSTools.EventLog
             if (char.IsHighSurrogate(comment[cutLength - 1]))
                 cutLength--;
 
-            return string.Concat(comment.AsSpan(0, cutLength), CommentTruncatedMarker);
+            return comment.Substring(0, cutLength) + CommentTruncatedMarker;
         }
 
         private static string GetData(BracketsNode node)
