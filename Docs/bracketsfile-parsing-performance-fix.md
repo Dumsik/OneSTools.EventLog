@@ -82,10 +82,10 @@ O(1) на символ. Квадратичность возникала искл
 прогнать экспортер на записи с большим `Comment`, чтобы подтвердить, что время парсинга
 вернулось к норме.
 
-## Побочная находка
+## Удалён мёртвый код
 
 `OneSTools.EventLog/StreamReaderExtensions.cs` (namespace `OneSTools.EventLog`) —
-неиспользуемый файл, дублирующий логику `BracketsStreamReaderExtensions`, но ни разу не
-вызываемый напрямую (все вызовы `.GetPosition()`/`.SetPosition()` в решении на самом деле
-идут через методы `LgfReader`/`LgpReader`/`BracketsListReader`, не через этот extension).
-Не удалён — не относится к задаче.
+неиспользуемый файл, дублировавший логику `BracketsStreamReaderExtensions`, но ни разу не
+вызываемый напрямую (все вызовы `.GetPosition()`/`.SetPosition()` в решении идут через методы
+`LgfReader`/`LgpReader`/`BracketsListReader`, а работу со `StreamReader` делает вендоренный
+`BracketsStreamReaderExtensions`). Удалён.
